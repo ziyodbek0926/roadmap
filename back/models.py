@@ -107,3 +107,11 @@ class UserResult(Base):
     sana = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="results")
+
+class CompletedLesson(Base):
+    __tablename__ = "completed_lessons"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    lesson_id = Column(Integer, ForeignKey("lessons.id"))
+    sana = Column(DateTime, default=datetime.utcnow)

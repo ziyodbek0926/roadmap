@@ -47,3 +47,26 @@ class QuizResultResponse(BaseModel):
     time_spent: float
     coeff_c: float
     xabar: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class LessonBase(BaseModel):
+    id: int
+    tartib_raqam: int
+    mavzu_nomi: str
+    video_url: Optional[str] = None
+    pdf_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class CourseRoadmapResponse(BaseModel):
+    id: int
+    nom: str
+    daraja: str
+    lessons: list[LessonBase] = [] 
+
+    class Config:
+        from_attributes = True
