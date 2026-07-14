@@ -1,92 +1,104 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import api from '../lib/api';
+import useAuthStore from '../store/useAuthStore';
+import AuroraBackground from '../components/AuroraBackground';
 
 export default function Login() {
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { setToken, fetchProfile } = useAuthStore();
 
   const handleChange = (e) => {
-    setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    
+    setSubmitting(true);
     try {
-      const formData = new URLSearchParams();
-      formData.append('username', loginForm.username);
-      formData.append('password', loginForm.password);
+      const body = new URLSearchParams();
+      body.append('username', form.username);
+      body.append('password', form.password);
 
-      const response = await axios.post('http://localhost:8000/auth/login', formData);
-      
-      localStorage.setItem('access_token', response.data.access_token);
-      
+      const res = await api.post('/auth/login', body);
+      setToken(res.data.access_token);
+      await fetchProfile();
+
+      toast.success("Xush kelibsiz! 🎉");
       navigate('/dashboard');
-    } catch (err) {
-      setError('Login yoki parol xato!');
+    } catch {
+      // api.js interceptor already toasts the server's error message
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
-        
-        {/* Logotip / Sarlavha */}
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+      <AuroraBackground />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="relative z-10 glass w-full max-w-md rounded-4xl shadow-pop p-8 md:p-10"
+      >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#374151] mb-2">EdTech Platform</h1>
-          <p className="text-gray-500">Tizimga kirish uchun login va parolingizni kiriting</p>
+          <div className="text-5xl mb-3">🎓</div>
+          <h1 className="text-3xl font-bold text-ink-900 mb-2">EduTech Platform</h1>
+          <p className="text-ink-700/80">Davom etish uchun tizimga kiring</p>
         </div>
 
-        {/* Xatolik xabari */}
-        {error && (
-          <div className="bg-red-100 text-red-600 p-3 rounded-lg mb-4 text-sm text-center">
-            {error}
-          </div>
-        )}
-
-        {/* Forma */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Login</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-semibold text-ink-700 mb-1.5">Login</label>
+            <input
+              type="text"
               name="username"
               required
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#A78BFA] focus:ring-2 focus:ring-[#A78BFA] transition-all"
+              autoFocus
+              className="w-full px-4 py-3 rounded-2xl border-2 border-white/70 bg-white/70 focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-200 transition-all placeholder:text-ink-400"
               placeholder="Loginingizni kiriting"
-              value={loginForm.username}
+              value={form.username}
               onChange={handleChange}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Parol</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-semibold text-ink-700 mb-1.5">Parol</label>
+            <input
+              type="password"
               name="password"
               required
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#A78BFA] focus:ring-2 focus:ring-[#A78BFA] transition-all"
+              className="w-full px-4 py-3 rounded-2xl border-2 border-white/70 bg-white/70 focus:outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-200 transition-all placeholder:text-ink-400"
               placeholder="••••••••"
-              value={loginForm.password}
+              value={form.password}
               onChange={handleChange}
             />
           </div>
 
-          <button 
-            type="submit" 
-            className="w-full py-3 px-4 bg-[#A78BFA] hover:bg-[#8b5cf6] text-white font-semibold rounded-xl transition-colors duration-200 shadow-md shadow-purple-200"
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            type="submit"
+            disabled={submitting}
+            className="w-full py-3.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white font-bold rounded-2xl transition-colors shadow-pop"
           >
-            Tizimga kirish
-          </button>
+            {submitting ? 'Tekshirilmoqda...' : 'Tizimga kirish'}
+          </motion.button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-500">
-          Hisobingiz yo'qmi? <span className="text-[#A78BFA] hover:underline cursor-pointer font-medium">Ro'yxatdan o'tish</span>
+        <div className="mt-6 text-center text-sm text-ink-700/80">
+          Hisobingiz yo'qmi?{' '}
+          <Link to="/register" className="text-primary-600 hover:underline font-bold">
+            Ro'yxatdan o'tish
+          </Link>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

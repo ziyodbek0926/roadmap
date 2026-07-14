@@ -7,7 +7,7 @@ from routers import auth, onboarding, quiz, dashboard, content, admin
 # Jadvallarni yaratish
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="EdTech Platform API")
+app = FastAPI(title="EduTech Platform API")
 
 origins = [
     "http://localhost:3000",      
@@ -32,4 +32,4 @@ app.include_router(admin.router)
 
 @app.get("/")
 def read_root():
-    return {"xabar": "EdTech platformasi orqa mantiqi (Backend) to'liq ishga tushdi va Frontend bilan ulanishga tayyor!"}
+    return {"xabar": "EduTech platformasi orqa mantiqi (Backend) to'liq ishga tushdi va Frontend bilan ulanishga tayyor!"}
