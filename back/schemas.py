@@ -6,26 +6,33 @@ independently of the DB schema, and so internal-only fields like
 hashed_password can never accidentally leak into a response.
 """
 import re
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, field_validator
 
 from models import RegionEnum
 
 PHONE_REGEX = re.compile(r"^\+?\d{9,15}$")
 
 
+def _validate_phone_number(value: str) -> str:
+    if not PHONE_REGEX.match(value):
+        raise ValueError("phone_number must be 9-15 digits, optionally prefixed with '+'")
+    return value
+
+
+# Shared annotated type so both registration and login validate phone_number
+# the same way without duplicating the field_validator on each model.
+PhoneNumber = Annotated[str, AfterValidator(_validate_phone_number)]
+
+
 class UserBase(BaseModel):
     full_name: str
-    email: EmailStr
-    phone_number: str
+    phone_number: PhoneNumber
     region: RegionEnum
 
-    @field_validator("phone_number")
-    @classmethod
-    def validate_phone_number(cls, value: str) -> str:
-        if not PHONE_REGEX.match(value):
-            raise ValueError("phone_number must be 9-15 digits, optionally prefixed with '+'")
-        return value
+    # Not collected at registration and not used for login -- see models.User.email.
+    email: EmailStr | None = None
 
 
 class UserCreate(UserBase):
@@ -55,7 +62,7 @@ class UserResponse(UserBase):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    phone_number: PhoneNumber
     password: str
 
 

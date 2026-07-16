@@ -44,7 +44,11 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+
+    # phone_number is the login identifier for this platform. email is kept
+    # as an optional column for future use (notifications, password reset)
+    # but is not collected at registration and never used to authenticate.
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     phone_number: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
     region: Mapped[RegionEnum] = mapped_column(SAEnum(RegionEnum, name="region_enum"), nullable=False)

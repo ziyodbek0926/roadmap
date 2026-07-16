@@ -75,14 +75,16 @@ async def get_current_user(
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
-    """Create a new account. Rejects a duplicate email or phone_number up front."""
-    existing = await db.execute(
-        select(User).where(or_(User.email == payload.email, User.phone_number == payload.phone_number))
-    )
+    """Create a new account. phone_number is the unique login identifier; email is optional."""
+    conflict_conditions = [User.phone_number == payload.phone_number]
+    if payload.email:
+        conflict_conditions.append(User.email == payload.email)
+
+    existing = await db.execute(select(User).where(or_(*conflict_conditions)))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email or phone number already exists",
+            detail="A user with this phone number or email already exists",
         )
 
     user = User(
@@ -100,11 +102,11 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
 
 @router.post("/login", response_model=Token)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> Token:
-    result = await db.execute(select(User).where(User.email == payload.email))
+    result = await db.execute(select(User).where(User.phone_number == payload.phone_number))
     user = result.scalar_one_or_none()
 
     if user is None or not verify_password(payload.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect phone number or password")
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated")

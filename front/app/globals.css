@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbfaf8;
+  --foreground: #2b2a28;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Light Aluminum: cool neutral grays for chrome, borders, muted text */
+  --color-aluminum-50: #f8f9fa;
+  --color-aluminum-100: #eef0f2;
+  --color-aluminum-200: #e1e4e8;
+  --color-aluminum-300: #cbd2d9;
+  --color-aluminum-400: #9aa5b1;
+  --color-aluminum-500: #77828e;
+  --color-aluminum-600: #5b6572;
+  --color-aluminum-700: #434b55;
+  --color-aluminum-900: #21262c;
+
+  /* Light Brown: warm accent for CTAs, links, focus states */
+  --color-brown-50: #fbf6f0;
+  --color-brown-100: #f3e5d3;
+  --color-brown-200: #e8cdaa;
+  --color-brown-300: #ddb892;
+  --color-brown-400: #c9a27e;
+  --color-brown-500: #b08968;
+  --color-brown-600: #96714f;
+  --color-brown-700: #7a5a3d;
+}
+
+/* No prefers-color-scheme dark override on purpose -- the brief calls for a
+   single soft White/Aluminum/Brown look, not a dark theme variant. */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
