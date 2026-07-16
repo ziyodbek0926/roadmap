@@ -1,117 +1,103 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+"""
+SQLAlchemy ORM models: User, CourseDirection, UserProgress.
+"""
+import enum
 from datetime import datetime
-from database import Base 
+
+from sqlalchemy import Enum as SAEnum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+
+from database import Base
+
+
+class RegionEnum(str, enum.Enum):
+    """
+    Uzbekistan's administrative regions (hudud).
+
+    Stored as a native Postgres ENUM (via the SAEnum column below) instead
+    of a free-text string so registration data stays consistent and
+    filtering/grouping users by region stays cheap. SQLAlchemy persists
+    enum *names* (e.g. "TOSHKENT_SHAHRI") in the DB by default -- that's
+    fine, it's just an internal storage detail; the API always speaks in
+    the human-readable *values* below via the Pydantic schema.
+    """
+
+    TOSHKENT_SHAHRI = "Toshkent shahri"
+    TOSHKENT_VILOYATI = "Toshkent viloyati"
+    ANDIJON = "Andijon"
+    BUXORO = "Buxoro"
+    FARGONA = "Farg'ona"
+    JIZZAX = "Jizzax"
+    XORAZM = "Xorazm"
+    NAMANGAN = "Namangan"
+    NAVOIY = "Navoiy"
+    QASHQADARYO = "Qashqadaryo"
+    QORAQALPOGISTON = "Qoraqalpog'iston"
+    SAMARQAND = "Samarqand"
+    SIRDARYO = "Sirdaryo"
+    SURXONDARYO = "Surxondaryo"
+
 
 class User(Base):
     __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    ism_sharif = Column(String, nullable=False)
-    telefon = Column(String, unique=True, index=True, nullable=False)
-    hudud = Column(String)
-    maktab = Column(String)
-    yosh = Column(Integer)
-    login = Column(String, unique=True, index=True, nullable=False)
-    parol_hash = Column(String, nullable=False)
-    rol = Column(String, default="student")
-    created_at = Column(DateTime, default=datetime.utcnow)
 
-    directions = relationship("UserDirection", back_populates="user")
-    results = relationship("UserResult", back_populates="user")
+    id: Mapped[int] = mapped_column(primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
 
-class Direction(Base):
-    __tablename__ = "directions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String, nullable=False) 
-    ta_rif = Column(Text)
+    phone_number: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
+    region: Mapped[RegionEnum] = mapped_column(SAEnum(RegionEnum, name="region_enum"), nullable=False)
 
-    courses = relationship("Course", back_populates="direction")
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-class UserDirection(Base):
-    __tablename__ = "user_directions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    direction_id = Column(Integer, ForeignKey("directions.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
-    user = relationship("User", back_populates="directions")
+    progress_entries: Mapped[list["UserProgress"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
-class Course(Base):
-    __tablename__ = "courses"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    direction_id = Column(Integer, ForeignKey("directions.id"))
-    nom = Column(String, nullable=False)
-    daraja = Column(String)
 
-    direction = relationship("Direction", back_populates="courses")
-    lessons = relationship("Lesson", back_populates="course")
+class CourseDirection(Base):
+    """
+    A learning track/category (e.g. "Backend Development", "Data Science")
+    that content is grouped under and that UserProgress is measured against.
+    """
 
-class Lesson(Base):
-    __tablename__ = "lessons"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id"))
-    tartib_raqam = Column(Integer)
-    mavzu_nomi = Column(String, nullable=False)
-    video_url = Column(String)
-    pdf_url = Column(String)
+    __tablename__ = "course_directions"
 
-    course = relationship("Course", back_populates="lessons")
-    quizzes = relationship("Quiz", back_populates="lesson")
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
 
-class Quiz(Base):
-    __tablename__ = "quizzes"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    lesson_id = Column(Integer, ForeignKey("lessons.id"))
-    nom = Column(String)
-    kutilgan_vaqt = Column(Float) # T_norm (soatda)
+    progress_entries: Mapped[list["UserProgress"]] = relationship(back_populates="direction")
 
-    lesson = relationship("Lesson", back_populates="quizzes")
-    questions = relationship("Question", back_populates="quiz")
 
-class Question(Base):
-    __tablename__ = "questions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"))
-    savol_matni = Column(Text, nullable=False)
-    turi = Column(String)
-    qiyinchilik_darajasi = Column(Integer)
+class UserProgress(Base):
+    """
+    One user's gamified progress (XP, level, completion %) within one
+    CourseDirection. A user can progress through multiple directions, so
+    this is a many-to-many join table with extra columns, not a 1:1 link.
+    """
 
-    quiz = relationship("Quiz", back_populates="questions")
-    answers = relationship("Answer", back_populates="question")
+    __tablename__ = "user_progress"
+    __table_args__ = (UniqueConstraint("user_id", "direction_id", name="uq_user_direction"),)
 
-class Answer(Base):
-    __tablename__ = "answers"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("questions.id"))
-    javob_matni = Column(Text, nullable=False)
-    is_correct = Column(Boolean, default=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    direction_id: Mapped[int] = mapped_column(
+        ForeignKey("course_directions.id", ondelete="CASCADE"), nullable=False
+    )
 
-    question = relationship("Question", back_populates="answers")
+    xp_points: Mapped[int] = mapped_column(default=0, nullable=False)
+    current_level: Mapped[int] = mapped_column(default=1, nullable=False)
+    completion_percentage: Mapped[float] = mapped_column(default=0.0, nullable=False)
 
-class UserResult(Base):
-    __tablename__ = "user_results"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"))
-    score = Column(Float) 
-    time_spent = Column(Float) 
-    coeff_c = Column(Float) 
-    sana = Column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
-    user = relationship("User", back_populates="results")
-
-class CompletedLesson(Base):
-    __tablename__ = "completed_lessons"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    lesson_id = Column(Integer, ForeignKey("lessons.id"))
-    sana = Column(DateTime, default=datetime.utcnow)
+    user: Mapped["User"] = relationship(back_populates="progress_entries")
+    direction: Mapped["CourseDirection"] = relationship(back_populates="progress_entries")

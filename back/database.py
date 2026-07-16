@@ -1,21 +1,38 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+"""
+Async SQLAlchemy engine, session factory, and declarative base.
 
-load_dotenv()
+CORE RULE #2 mandates async/await throughout the FastAPI app, so this uses
+the asyncio extension (create_async_engine + AsyncSession) rather than the
+classic sync Session -- a sync engine would block the event loop on every
+query and defeat the point of an async framework.
+"""
+from collections.abc import AsyncGenerator
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from config import settings
 
-Base = declarative_base()
+engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False, 
+    autoflush=False,
+)
+
+
+class Base(DeclarativeBase):
+    """Shared declarative base every ORM model inherits from."""
+
+    pass
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    FastAPI dependency that yields one session per request and closes it
+    afterwards regardless of whether the request succeeded or raised.
+    """
+    async with AsyncSessionLocal() as session:
+        yield session

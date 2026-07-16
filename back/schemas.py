@@ -1,72 +1,70 @@
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+"""
+Pydantic schemas: the request/response contracts for the auth API.
 
-class UserCreate(BaseModel):
-    ism_sharif: str
-    telefon: str
-    hudud: Optional[str] = None
-    maktab: Optional[str] = None
-    yosh: Optional[int] = None
-    login: str
-    parol: str
+Kept separate from the ORM models (models.py) so the wire format can evolve
+independently of the DB schema, and so internal-only fields like
+hashed_password can never accidentally leak into a response.
+"""
+import re
 
-class UserResponse(BaseModel):
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+
+from models import RegionEnum
+
+PHONE_REGEX = re.compile(r"^\+?\d{9,15}$")
+
+
+class UserBase(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone_number: str
+    region: RegionEnum
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, value: str) -> str:
+        if not PHONE_REGEX.match(value):
+            raise ValueError("phone_number must be 9-15 digits, optionally prefixed with '+'")
+        return value
+
+
+class UserCreate(UserBase):
+    """
+    Registration payload. NOTE: intentionally has no age/date_of_birth
+    field and no age-based validator -- this platform has no age
+    restriction, per spec.
+    """
+
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("password must be at least 8 characters long")
+        return value
+
+
+class UserResponse(UserBase):
+    """Public-facing user representation. Deliberately excludes hashed_password."""
+
     id: int
-    ism_sharif: str
-    telefon: str
-    login: str
-    rol: str
-    created_at: datetime
+    is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-class OnboardingSubmit(BaseModel):
-    user_id: int
-    test_type: str 
-    tanlangan_yonalish_id: Optional[int] = None
-    natija_bali: float 
 
-class OnboardingResponse(BaseModel):
-    status: str
-    message: str
-    next_step: Optional[str] = None
-    biriktirilgan_yonalish: Optional[str] = None
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
-class QuizSubmit(BaseModel):
-    user_id: int
-    quiz_id: int
-    score: float       
-    time_spent: float  
-
-class QuizResultResponse(BaseModel):
-    user_id: int
-    quiz_id: int
-    score: float
-    time_spent: float
-    coeff_c: float
-    xabar: str
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
 
-class LessonBase(BaseModel):
-    id: int
-    tartib_raqam: int
-    mavzu_nomi: str
-    video_url: Optional[str] = None
-    pdf_url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+class TokenPayload(BaseModel):
+    """Shape of the claims we actually rely on once a JWT is decoded."""
 
-class CourseRoadmapResponse(BaseModel):
-    id: int
-    nom: str
-    daraja: str
-    lessons: list[LessonBase] = [] 
-
-    class Config:
-        from_attributes = True
+    sub: str | None = None 

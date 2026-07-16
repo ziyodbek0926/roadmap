@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+asyncpg
+pydantic
+pydantic-settings
+email-validator
+python-jose[cryptography]
+passlib[bcrypt]
+# passlib's bcrypt backend reads bcrypt.__about__.__version__, which was
+# removed in bcrypt>=4.1 -- pin below 4.1 to avoid that crash at hash time.
+bcrypt<4.1
+python-dotenv
